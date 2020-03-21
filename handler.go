@@ -1,6 +1,7 @@
 package main
 
 import (
+    "sync"
     "io"
     "net"
     "context"
@@ -16,20 +17,21 @@ func NewConnHandler(logger *CondLogger, connfactory *ConnFactory) *ConnHandler {
 }
 
 func (h *ConnHandler) proxy(left, right net.Conn) {
-    done := make(chan bool, 2)
+    wg := sync.WaitGroup{}
     cpy := func (dst, src net.Conn) {
+        defer wg.Done()
         b, err := io.Copy(dst, src)
         h.logger.Debug("cpy done: bytes=%d err=%v", b, err)
-        done <- true
     }
+    wg.Add(2)
     go cpy(left, right)
     go cpy(right, left)
-    <-done
+    wg.Wait()
 }
 
 func (h *ConnHandler) handle (c net.Conn) {
     remote_addr := c.RemoteAddr()
-    defer h.logger.Info("Connection %s closed", remote_addr)
+    defer h.logger.Info("Connection %s done", remote_addr)
     h.logger.Info("Got new connection from %s", remote_addr)
     ctx := context.Background()
     tlsconn, err := h.connfactory.DialContext(ctx)
