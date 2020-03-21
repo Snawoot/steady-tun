@@ -8,7 +8,7 @@ type TCPListener struct {
     address string
     port uint16
     handler func(net.Conn)
-    quit chan bool
+    quit chan struct{}
     listener *net.TCPListener
     logger *CondLogger
 }
@@ -20,7 +20,7 @@ func NewTCPListener(address string, port uint16, handler func(net.Conn),
         port: port,
         handler: handler,
         logger: logger,
-        quit: make(chan bool, 1),
+        quit: make(chan struct{}, 1),
     }
 }
 
@@ -48,7 +48,7 @@ func (l *TCPListener) serve() {
             select {
             case <-l.quit:
                 l.logger.Info("Leaving accept loop.")
-                l.quit <- true
+                l.quit <- struct{}{}
                 return
             default:
                 l.logger.Error("Accept error: %s", err)
@@ -63,7 +63,7 @@ func (l *TCPListener) serve() {
 }
 
 func (l *TCPListener) Stop() {
-    l.quit <- true
+    l.quit <- struct{}{}
     l.listener.Close()
     <-l.quit
 }

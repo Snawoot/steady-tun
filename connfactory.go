@@ -102,10 +102,10 @@ type WrappedConn struct {
 func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedConn, error) {
     var newconn *tls.Conn
     var err error
-    ch := make(chan bool, 1)
+    ch := make(chan struct{}, 1)
     go func () {
         newconn, err = tls.DialWithDialer(cf.dialer, "tcp", cf.addr, cf.tlsConfig)
-        ch <- true
+        ch <- struct{}{}
     }()
     select {
     case <- ch:

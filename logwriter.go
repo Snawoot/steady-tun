@@ -12,7 +12,7 @@ const QUEUE_SHUTDOWN_TIMEOUT = 500 * time.Millisecond
 type LogWriter struct {
     writer io.Writer
     ch chan []byte
-    done chan bool
+    done chan struct{}
 }
 
 func (lw *LogWriter) Write(p []byte) (int, error) {
@@ -29,7 +29,7 @@ func (lw *LogWriter) Write(p []byte) (int, error) {
 func NewLogWriter(writer io.Writer) *LogWriter {
     lw := &LogWriter{writer,
                      make(chan []byte, MAX_LOG_QLEN),
-                     make(chan bool)}
+                     make(chan struct{})}
     go lw.loop()
     return lw
 }
@@ -38,7 +38,7 @@ func (lw *LogWriter) loop() {
     for p := range lw.ch {
         lw.writer.Write(p)
     }
-    lw.done <- true
+    lw.done <- struct{}{}
 }
 
 func (lw *LogWriter) Close() {
