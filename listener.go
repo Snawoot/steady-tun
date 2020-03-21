@@ -7,13 +7,13 @@ import (
 type TCPListener struct {
     address string
     port uint16
-    handler func(*net.TCPConn)
+    handler func(net.Conn)
     quit chan bool
     listener *net.TCPListener
     logger *CondLogger
 }
 
-func NewTCPListener(address string, port uint16, handler func(*net.TCPConn),
+func NewTCPListener(address string, port uint16, handler func(net.Conn),
                     logger *CondLogger) *TCPListener {
     return &TCPListener{
         address: address,
@@ -43,7 +43,7 @@ func (l *TCPListener) Start() error {
 
 func (l *TCPListener) serve() {
     for {
-        conn, err := l.listener.AcceptTCP()
+        conn, err := l.listener.Accept()
         if err != nil {
             select {
             case <-l.quit:
@@ -55,7 +55,7 @@ func (l *TCPListener) serve() {
                 continue
             }
         }
-        go func(c *net.TCPConn) {
+        go func(c net.Conn) {
             defer c.Close()
             l.handler(c)
         }(conn)
