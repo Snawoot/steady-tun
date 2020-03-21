@@ -5,11 +5,28 @@ import (
     "net"
     "crypto/tls"
     "crypto/x509"
+    "io"
     "io/ioutil"
     "errors"
     "context"
     "strconv"
 )
+
+const MAX_READ_CH_QLEN = 128
+const COPY_BUFFER_SIZE = 32 * 1024
+
+type WrappedConn interface {
+    Read(p []byte) (n int, err error)
+    Write(p []byte) (n int, err error)
+    Close()
+    LocalAddr() net.Addr
+    RemoteAddr() net.Addr
+    SetDeadline(t time.Time) error
+    SetReadDeadline(t time.Time) error
+    SetWriteDeadline(t time.Time) error
+    ReadContext(ctx context.Context, p []byte) (n int, err error)
+    WriteContext(ctx context.Context, p []byte) (n int, err error)
+}
 
 type ConnFactory struct {
     addr string
@@ -93,13 +110,13 @@ func NewConnFactory(host string, port uint16, timeout time.Duration,
     }, nil
 }
 
-type WrappedConn struct {
+type WrappedTLSConn struct {
     conn *tls.Conn
     readch chan []byte
     logger *CondLogger
 }
 
-func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedConn, error) {
+func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedTLSConn, error) {
     var newconn *tls.Conn
     var err error
     ch := make(chan struct{}, 1)
@@ -113,8 +130,78 @@ func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedConn, error) {
             cf.logger.Error("Got error during connection: %s", err)
             return nil, err
         }
-        return &WrappedConn{conn: newconn, logger: cf.logger}, nil
+        wrappedconn := &WrappedTLSConn{
+            conn: newconn,
+            logger: cf.logger,
+            readch: make(chan []byte, MAX_READ_CH_QLEN),
+        }
+        go wrappedconn.bgRead()
+        return wrappedconn, nil
     case <- ctx.Done():
         return nil, errors.New("Context was cancelled")
+    }
+}
+
+func (c *WrappedTLSConn) bgRead() {
+    buff := make([]byte, COPY_BUFFER_SIZE)
+    var out []byte
+    for {
+        nb, err := c.conn.Read(buff)
+        c.logger.Debug("bgRead: read %d bytes, err=%v", nb, err)
+        if nb > 0 {
+            out = make([]byte, nb)
+            copy(out, buff)
+        }
+        c.readch <- out
+        if err != nil {
+            close(c.readch)
+            return
+        }
+    }
+}
+
+func (c *WrappedTLSConn) Read(p []byte) (n int, err error) {
+    return c.ReadContext(context.Background(), p)
+}
+
+func (c *WrappedTLSConn) Write(p []byte) (n int, err error) {
+    return c.conn.Write(p)
+}
+
+func (c *WrappedTLSConn) Close() error {
+    return c.conn.Close()
+}
+
+func (c *WrappedTLSConn) LocalAddr() net.Addr {
+    return c.conn.LocalAddr()
+}
+
+func (c *WrappedTLSConn) RemoteAddr() net.Addr {
+    return c.conn.RemoteAddr()
+}
+
+func (c *WrappedTLSConn) SetDeadline(t time.Time) error {
+    return c.conn.SetDeadline(t)
+}
+
+func (c *WrappedTLSConn) SetReadDeadline(t time.Time) error {
+    return c.conn.SetReadDeadline(t)
+}
+
+func (c *WrappedTLSConn) SetWriteDeadline(t time.Time) error {
+    return c.conn.SetWriteDeadline(t)
+}
+
+func (c *WrappedTLSConn) ReadContext(ctx context.Context, p []byte) (n int, err error) {
+    select {
+    case <- ctx.Done():
+        return 0, errors.New("Context was cancelled")
+    case data, ok := <-c.readch:
+        if ok {
+            copy(p, data)
+            return len(data), nil
+        } else {
+            return 0, io.EOF
+        }
     }
 }

@@ -39,6 +39,6 @@ func (h *ConnHandler) handle (c net.Conn) {
         h.logger.Error("Upstream connection failed: %s", err.Error())
         return
     }
-    defer tlsconn.conn.Close()
-    h.proxy(c, tlsconn.conn)
+    defer tlsconn.Close()
+    h.proxy(c, tlsconn)
 }
