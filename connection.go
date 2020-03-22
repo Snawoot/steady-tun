@@ -1,7 +1,6 @@
 package main
 
 import (
-    "sync"
     "time"
     "net"
     "crypto/tls"
@@ -14,6 +13,12 @@ import (
 
 const MAX_READ_CH_QLEN = 128
 const COPY_BUFFER_SIZE = 32 * 1024
+var ZEROTIME time.Time
+var EPOCH time.Time
+
+func init() {
+    EPOCH = time.Unix(0, 0)
+}
 
 type WrappedConn interface {
     Read(p []byte) (n int, err error)
@@ -112,11 +117,7 @@ func NewConnFactory(host string, port uint16, timeout time.Duration,
 
 type WrappedTLSConn struct {
     conn *tls.Conn
-    readch chan []byte
-    readmux sync.Mutex
     logger *CondLogger
-    readleftover []byte
-    readerror error
 }
 
 func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedTLSConn, error) {
@@ -136,36 +137,15 @@ func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedTLSConn, error)
         wrappedconn := &WrappedTLSConn{
             conn: newconn,
             logger: cf.logger,
-            readch: make(chan []byte, MAX_READ_CH_QLEN),
         }
-        go wrappedconn.bgRead()
         return wrappedconn, nil
     case <- ctx.Done():
         return nil, errors.New("Context was cancelled")
     }
 }
 
-func (c *WrappedTLSConn) bgRead() {
-    buff := make([]byte, COPY_BUFFER_SIZE)
-    var out []byte
-    for {
-        nb, err := c.conn.Read(buff)
-        c.logger.Debug("bgRead: read %d bytes, err=%v", nb, err)
-        if nb > 0 {
-            out = make([]byte, nb)
-            copy(out, buff)
-        }
-        c.readch <- out
-        if err != nil {
-            c.readerror = err
-            close(c.readch)
-            return
-        }
-    }
-}
-
 func (c *WrappedTLSConn) Read(p []byte) (n int, err error) {
-    return c.ReadContext(context.Background(), p)
+    return c.conn.Read(p)
 }
 
 func (c *WrappedTLSConn) Write(p []byte) (n int, err error) {
@@ -197,34 +177,18 @@ func (c *WrappedTLSConn) SetWriteDeadline(t time.Time) error {
 }
 
 func (c *WrappedTLSConn) ReadContext(ctx context.Context, p []byte) (n int, err error) {
-    var (
-        data []byte
-        ok bool
-    )
-    c.readmux.Lock()
-    if c.readleftover == nil {
-        select {
-        case <- ctx.Done():
-            n, err = 0, errors.New("Context was cancelled")
-            c.readmux.Unlock()
-            return
-        case data, ok = <-c.readch:
-            if !ok {
-                n, err = 0, c.readerror
-                c.readmux.Unlock()
-                return
-            }
-        }
-    } else {
-        data = c.readleftover
+    ch := make(chan struct{}, 1)
+    go func () {
+        n, err = c.conn.Read(p)
+        ch <-struct{}{}
+    }()
+    select {
+    case <-ctx.Done():
+        c.conn.SetReadDeadline(EPOCH)
+        <-ch
+        c.conn.SetReadDeadline(ZEROTIME)
+        return 0, errors.New("Read cancelled")
+    case <-ch:
     }
-    bsent := copy(p, data)
-    if bsent < len(data) {
-        c.readleftover = data[bsent:]
-    } else {
-        c.readleftover = nil
-    }
-    c.readmux.Unlock()
-    n, err = bsent, nil
     return
 }
