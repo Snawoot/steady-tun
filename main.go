@@ -29,7 +29,7 @@ type CLIArgs struct {
     bind_address string
     bind_port uint
     pool_size uint
-    backoff, ttl, timeout time.Duration
+    backoff, ttl, timeout, pool_wait time.Duration
     cert, key, cafile string
     hostname_check bool
     tls_servername string
@@ -48,6 +48,7 @@ func parse_args() CLIArgs {
     flag.DurationVar(&args.backoff, "backoff", 5 * time.Second, "delay between connection attempts")
     flag.DurationVar(&args.ttl, "ttl", 30 * time.Second, "lifetime of idle pool connection in seconds")
     flag.DurationVar(&args.timeout, "timeout", 4 * time.Second, "server connect timeout")
+    flag.DurationVar(&args.pool_wait, "pool-wait", 15 * time.Second, "timeout for acquiring connection from pool")
     flag.StringVar(&args.cert, "cert", "", "use certificate for client TLS auth")
     flag.StringVar(&args.key, "key", "", "key for TLS certificate")
     flag.StringVar(&args.cafile, "cafile", "", "override default CA certs by specified in file")
@@ -82,6 +83,8 @@ func main() {
                                    args.verbosity)
     connLogger := NewCondLogger(log.New(logWriter, "CONN    : ", log.LstdFlags | log.Lshortfile),
                                 args.verbosity)
+    poolLogger := NewCondLogger(log.New(logWriter, "POOL    : ", log.LstdFlags | log.Lshortfile),
+                                args.verbosity)
 
     connfactory, err := NewConnFactory(args.host,
                                        uint16(args.port),
@@ -95,6 +98,9 @@ func main() {
     if err != nil {
         panic(err)
     }
+    pool := NewConnPool(args.pool_size, args.ttl, args.backoff, connfactory, poolLogger)
+    pool.Start()
+    defer pool.Stop()
 
     listener := NewTCPListener(args.bind_address,
                                uint16(args.bind_port),
