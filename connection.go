@@ -180,7 +180,6 @@ func (c *WrappedTLSConn) ReadContext(ctx context.Context, p []byte) (n int, err 
     ch := make(chan struct{}, 1)
     go func () {
         n, err = c.conn.Read(p)
-        c.logger.Debug("ReadContext -> %d, %v", n, err)
         ch <-struct{}{}
     }()
     select {
