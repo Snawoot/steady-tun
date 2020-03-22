@@ -1,11 +1,11 @@
 package main
 
 import (
+    "sync"
     "time"
     "net"
     "crypto/tls"
     "crypto/x509"
-    "io"
     "io/ioutil"
     "errors"
     "context"
@@ -113,7 +113,10 @@ func NewConnFactory(host string, port uint16, timeout time.Duration,
 type WrappedTLSConn struct {
     conn *tls.Conn
     readch chan []byte
+    readmux sync.Mutex
     logger *CondLogger
+    readleftover []byte
+    readerror error
 }
 
 func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedTLSConn, error) {
@@ -193,15 +196,34 @@ func (c *WrappedTLSConn) SetWriteDeadline(t time.Time) error {
 }
 
 func (c *WrappedTLSConn) ReadContext(ctx context.Context, p []byte) (n int, err error) {
-    select {
-    case <- ctx.Done():
-        return 0, errors.New("Context was cancelled")
-    case data, ok := <-c.readch:
-        if ok {
-            copy(p, data)
-            return len(data), nil
-        } else {
-            return 0, io.EOF
+    var (
+        data []byte
+        ok bool
+    )
+    c.readmux.Lock()
+    if c.readleftover == nil {
+        select {
+        case <- ctx.Done():
+            n, err = 0, errors.New("Context was cancelled")
+            c.readmux.Unlock()
+            return
+        case data, ok = <-c.readch:
+            if !ok {
+                n, err = 0, c.readerror
+                c.readmux.Unlock()
+                return
+            }
         }
+    } else {
+        data = c.readleftover
     }
+    bsent := copy(p, data)
+    if bsent < len(data) {
+        c.readleftover = data[bsent:]
+    } else {
+        c.readleftover = nil
+    }
+    c.readmux.Unlock()
+    n, err = bsent, nil
+    return
 }
