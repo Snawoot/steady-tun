@@ -4,16 +4,18 @@ import (
     "sync"
     "io"
     "net"
+    "time"
     "context"
 )
 
 type ConnHandler struct {
+    pool *ConnPool
+    pool_wait time.Duration
     logger *CondLogger
-    connfactory *ConnFactory
 }
 
-func NewConnHandler(logger *CondLogger, connfactory *ConnFactory) *ConnHandler {
-    return &ConnHandler{logger, connfactory}
+func NewConnHandler(pool *ConnPool, pool_wait time.Duration, logger *CondLogger) *ConnHandler {
+    return &ConnHandler{pool, pool_wait, logger}
 }
 
 func (h *ConnHandler) proxy(ctx context.Context, left, right net.Conn) {
@@ -47,12 +49,21 @@ func (h *ConnHandler) handle (ctx context.Context, c net.Conn) {
     remote_addr := c.RemoteAddr()
     h.logger.Info("Got new connection from %s", remote_addr)
 
-    tlsconn, err := h.connfactory.DialContext(ctx)
-    if err != nil {
-        h.logger.Error("Upstream connection failed: %s", err.Error())
+    select {
+    case <-time.After(h.pool_wait):
+        h.logger.Error("Timeout while waiting connection from pool")
         c.Close()
-        return
+    case tlsconn := <-h.pool.Get(ctx):
+        if tlsconn == nil {
+            select {
+            case <-ctx.Done():
+            default:
+                h.logger.Error("Error on connection retrieve from pool")
+            }
+            c.Close()
+        } else {
+            h.proxy(ctx, c, tlsconn)
+        }
     }
-    h.proxy(ctx, c, tlsconn)
     h.logger.Info("Connection %s done", remote_addr)
 }

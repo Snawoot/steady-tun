@@ -69,7 +69,8 @@ func (p *ConnPool) worker() {
                 continue
             }
         }
-        p.logger.Info("Established upstream connection %v", conn.LocalAddr())
+        localaddr := conn.LocalAddr()
+        p.logger.Debug("Established upstream connection %v", localaddr)
         p.qmux.Lock()
         waiter := p.waiters.Pop()
         if waiter != nil {
@@ -81,15 +82,15 @@ func (p *ConnPool) worker() {
             p.qmux.Unlock()
             select {
             case output_ch <-conn:
-                p.logger.Debug("Pool connection %v delivered via queue", conn.LocalAddr())
+                p.logger.Debug("Pool connection %v delivered via queue", localaddr)
             case <-time.After(p.ttl):
-                p.logger.Debug("Connection %v seem to be expired", conn.LocalAddr())
+                p.logger.Debug("Connection %v seem to be expired", localaddr)
                 p.qmux.Lock()
                 deleted_elem := p.prepared.Delete(queue_id)
                 p.qmux.Unlock()
                 if deleted_elem == nil {
                     // Someone already grabbed this slot from queue. Dispatch anyway.
-                    p.logger.Debug("Dead conn %v was grabbed from queue", conn.LocalAddr())
+                    p.logger.Debug("Dead conn %v was grabbed from queue", localaddr)
                     output_ch <-conn
                 } else {
                     conn.Close()

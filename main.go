@@ -75,6 +75,7 @@ func main() {
 
     logWriter := NewLogWriter(os.Stderr)
     defer logWriter.Close()
+
     mainLogger := NewCondLogger(log.New(logWriter, "MAIN    : ", log.LstdFlags | log.Lshortfile),
                                 args.verbosity)
     listenerLogger := NewCondLogger(log.New(logWriter, "LISTENER: ", log.LstdFlags | log.Lshortfile),
@@ -104,7 +105,7 @@ func main() {
 
     listener := NewTCPListener(args.bind_address,
                                uint16(args.bind_port),
-                               NewConnHandler(handlerLogger, connfactory).handle,
+                               NewConnHandler(pool, args.pool_wait, handlerLogger).handle,
                                listenerLogger)
     if err:= listener.Start(); err != nil {
         panic(err)
