@@ -180,6 +180,7 @@ func (c *WrappedTLSConn) ReadContext(ctx context.Context, p []byte) (n int, err 
     ch := make(chan struct{}, 1)
     go func () {
         n, err = c.conn.Read(p)
+        c.logger.Debug("ReadContext -> %d, %v", n, err)
         ch <-struct{}{}
     }()
     select {
@@ -187,7 +188,6 @@ func (c *WrappedTLSConn) ReadContext(ctx context.Context, p []byte) (n int, err 
         c.conn.SetReadDeadline(EPOCH)
         <-ch
         c.conn.SetReadDeadline(ZEROTIME)
-        return 0, errors.New("Read cancelled")
     case <-ch:
     }
     return
