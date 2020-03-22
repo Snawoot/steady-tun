@@ -16,6 +16,9 @@ type LogWriter struct {
 }
 
 func (lw *LogWriter) Write(p []byte) (int, error) {
+    if p == nil {
+        return 0, errors.New("Can't write nil byte slice")
+    }
     buf := make([]byte, len(p))
     copy(buf, p)
     select {
@@ -36,13 +39,16 @@ func NewLogWriter(writer io.Writer) *LogWriter {
 
 func (lw *LogWriter) loop() {
     for p := range lw.ch {
+        if p == nil {
+            break
+        }
         lw.writer.Write(p)
     }
     lw.done <- struct{}{}
 }
 
 func (lw *LogWriter) Close() {
-    close(lw.ch)
+    lw.ch <- nil
     timer := time.After(QUEUE_SHUTDOWN_TIMEOUT)
     select {
         case <-timer:
