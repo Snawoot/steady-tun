@@ -2,25 +2,35 @@ package main
 
 import (
 	"net"
+    "context"
+    "sync"
 )
+
+type HandlerFunc func(context.Context, net.Conn)
 
 type TCPListener struct {
     address string
     port uint16
-    handler func(net.Conn)
-    quit chan struct{}
+    handler HandlerFunc
+    quitaccept chan struct{}
     listener *net.TCPListener
     logger *CondLogger
+    ctx context.Context
+    cancel context.CancelFunc
+    shutdown sync.WaitGroup
 }
 
-func NewTCPListener(address string, port uint16, handler func(net.Conn),
+func NewTCPListener(address string, port uint16, handler HandlerFunc,
                     logger *CondLogger) *TCPListener {
+    ctx, cancel := context.WithCancel(context.Background())
     return &TCPListener{
         address: address,
         port: port,
         handler: handler,
         logger: logger,
-        quit: make(chan struct{}, 1),
+        quitaccept: make(chan struct{}, 1),
+        ctx: ctx,
+        cancel: cancel,
     }
 }
 
@@ -46,24 +56,27 @@ func (l *TCPListener) serve() {
         conn, err := l.listener.Accept()
         if err != nil {
             select {
-            case <-l.quit:
+            case <-l.quitaccept:
                 l.logger.Info("Leaving accept loop.")
-                l.quit <- struct{}{}
+                l.quitaccept <- struct{}{}
                 return
             default:
                 l.logger.Error("Accept error: %s", err)
                 continue
             }
         }
+        l.shutdown.Add(1)
         go func(c net.Conn) {
-            defer c.Close()
-            l.handler(c)
+            defer l.shutdown.Done()
+            l.handler(l.ctx, c)
         }(conn)
     }
 }
 
 func (l *TCPListener) Stop() {
-    l.quit <- struct{}{}
+    l.quitaccept <- struct{}{}
     l.listener.Close()
-    <-l.quit
+    <-l.quitaccept
+    l.cancel()
+    l.shutdown.Wait()
 }

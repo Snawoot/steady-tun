@@ -157,6 +157,7 @@ func (c *WrappedTLSConn) bgRead() {
         }
         c.readch <- out
         if err != nil {
+            c.readerror = err
             close(c.readch)
             return
         }
