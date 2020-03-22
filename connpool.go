@@ -19,6 +19,12 @@ type ConnPool struct {
     shutdown sync.WaitGroup
 }
 
+type watchedConn struct {
+    conn net.Conn
+    cancel context.CancelFunc
+    canceldone chan struct{}
+}
+
 func NewConnPool(size uint, ttl, backoff time.Duration,
                  connfactory *ConnFactory, logger *CondLogger) *ConnPool {
     ctx, cancel := context.WithCancel(context.Background())
@@ -49,9 +55,23 @@ func (p *ConnPool) do_backoff() {
     }
 }
 
+func (p *ConnPool) kill_prepared(queue_id uint, watched *watchedConn, output_ch chan *watchedConn) {
+    p.qmux.Lock()
+    deleted_elem := p.prepared.Delete(queue_id)
+    p.qmux.Unlock()
+    if deleted_elem == nil {
+        // Someone already grabbed this slot from queue. Dispatch anyway.
+        p.logger.Debug("Dead conn %v was grabbed from queue", watched.conn.LocalAddr())
+        output_ch <-watched
+    } else {
+        watched.conn.Close()
+    }
+}
+
 func (p *ConnPool) worker() {
     defer p.shutdown.Done()
-    output_ch := make(chan net.Conn)
+    output_ch := make(chan *watchedConn)
+    dummybuf := make([]byte, 1)
     for {
         select {
         case <-p.ctx.Done():
@@ -71,6 +91,7 @@ func (p *ConnPool) worker() {
         }
         localaddr := conn.LocalAddr()
         p.logger.Debug("Established upstream connection %v", localaddr)
+
         p.qmux.Lock()
         waiter := p.waiters.Pop()
         if waiter != nil {
@@ -80,21 +101,27 @@ func (p *ConnPool) worker() {
         } else {
             queue_id := p.prepared.Push(output_ch)
             p.qmux.Unlock()
+            readctx, readcancel := context.WithCancel(p.ctx)
+            readdone := make(chan struct{}, 1)
+            go func() {
+                conn.ReadContext(readctx, dummybuf)
+                readdone <-struct{}{}
+            }()
+            watched := &watchedConn{conn, readcancel, readdone}
             select {
-            case output_ch <-conn:
+            // Connection delivered via queue
+            case output_ch <-watched:
                 p.logger.Debug("Pool connection %v delivered via queue", localaddr)
+            // Connection disrupted
+            case <-readdone:
+                p.logger.Debug("Pool connection %v was disrupted", localaddr)
+                p.kill_prepared(queue_id, watched, output_ch)
+                p.do_backoff()
+            // Expired
             case <-time.After(p.ttl):
                 p.logger.Debug("Connection %v seem to be expired", localaddr)
-                p.qmux.Lock()
-                deleted_elem := p.prepared.Delete(queue_id)
-                p.qmux.Unlock()
-                if deleted_elem == nil {
-                    // Someone already grabbed this slot from queue. Dispatch anyway.
-                    p.logger.Debug("Dead conn %v was grabbed from queue", localaddr)
-                    output_ch <-conn
-                } else {
-                    conn.Close()
-                }
+                p.kill_prepared(queue_id, watched, output_ch)
+            // Pool context cancelled
             case <-p.ctx.Done():
                 conn.Close()
             }
@@ -126,7 +153,10 @@ func (p *ConnPool) Get(ctx context.Context) chan net.Conn {
         }()
     } else {
         p.qmux.Unlock()
-        out <-<-free.(chan net.Conn)
+        watched := <-(free.(chan *watchedConn))
+        watched.cancel()
+        <-watched.canceldone
+        out <-watched.conn
     }
     return out
 }
