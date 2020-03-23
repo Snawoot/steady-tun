@@ -11,7 +11,7 @@ steady-tun can be used with custom CAs and/or mutual TLS auth with certificates.
 ## Features
 
 * Based on proven TLS security and works with well-known server side daemons for TLS termination like haproxy and stunnel.
-* Firewall- and DPI-proof: connections are indistinguishable from HTTPS traffic. See `haproxy.cfg` in [config\_examples](https://github.com/Snawoot/ptw/tree/master/config_examples) directory for complete example of webserver masquerading proxy.
+* Firewall- and DPI-proof: connections are indistinguishable from HTTPS traffic.
 * Greater practical performance comparing to other TCP traffic forwading solutions thanks to separate TLS session for each TCP connection.
 * Hides TLS connection delay with connection pooling.
 * Supports TLS SNI (server name indication) spoof - it may be useful to bypass SNI based filters in firewalls.
@@ -28,8 +28,16 @@ go get github.com/Snawoot/steady-tun
 ## Usage example
 
 ```sh
-~/go/bin/steady-tun -dsthost proxy.example.com -dstport 443 -cert user.pem -key user.key -cafile ca.pem -bind-port 57800 -verbosity 0 -ttl 300s
+~/go/bin/steady-tun \
+    -dsthost proxy.example.com \
+    -dstport 443 \
+    -cert user.pem \
+    -key user.key \
+    -cafile ca.pem \
+    -ttl 300s
 ```
+
+Command in this example will start forwarding TCP connections from default local port 57800 to `proxy.example.com:443`. Authentication is performed with client certificate and key. Server verification is performed with custom certificate in file ca.pem.
 
 ## Synopsis
 
