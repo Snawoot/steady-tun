@@ -54,6 +54,8 @@ Usage of /home/user/go/bin/steady-tun:
     	override default CA certs by specified in file
   -cert string
     	use certificate for client TLS auth
+  -dialers uint
+    	concurrency limit for TLS connection attempts (default 2)
   -dsthost string
     	destination server hostname
   -dstport uint
