@@ -8,6 +8,7 @@ import (
     "os/signal"
     "syscall"
     "time"
+    "runtime"
 )
 
 func perror(msg string) {
@@ -29,6 +30,7 @@ type CLIArgs struct {
     bind_address string
     bind_port uint
     pool_size uint
+    dialers uint
     backoff, ttl, timeout, pool_wait time.Duration
     cert, key, cafile string
     hostname_check bool
@@ -45,6 +47,7 @@ func parse_args() CLIArgs {
     flag.StringVar(&args.bind_address, "bind-address", "127.0.0.1", "bind address")
     flag.UintVar(&args.bind_port, "bind-port", 57800, "bind port")
     flag.UintVar(&args.pool_size, "pool-size", 50, "connection pool size")
+    flag.UintVar(&args.dialers, "dialers", uint(runtime.GOMAXPROCS(0)), "concurrency limit for TLS connection attempts")
     flag.DurationVar(&args.backoff, "backoff", 5 * time.Second, "delay between connection attempts")
     flag.DurationVar(&args.ttl, "ttl", 30 * time.Second, "lifetime of idle pool connection in seconds")
     flag.DurationVar(&args.timeout, "timeout", 4 * time.Second, "server connect timeout")
@@ -66,6 +69,9 @@ func parse_args() CLIArgs {
     }
     if args.bind_port >= 65536 {
         arg_fail("Bad bind port!")
+    }
+    if args.dialers < 1 {
+        arg_fail("dialers parameter should be not less than 1")
     }
     return args
 }
@@ -95,6 +101,7 @@ func main() {
                                        args.cafile,
                                        args.hostname_check,
                                        args.tls_servername,
+                                       args.dialers,
                                        connLogger)
     if err != nil {
         panic(err)

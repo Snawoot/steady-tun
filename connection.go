@@ -9,6 +9,7 @@ import (
     "errors"
     "context"
     "strconv"
+    "golang.org/x/sync/semaphore"
 )
 
 const MAX_READ_CH_QLEN = 128
@@ -37,12 +38,13 @@ type ConnFactory struct {
     addr string
     tlsConfig *tls.Config
     dialer *net.Dialer
+    sem *semaphore.Weighted
     logger *CondLogger
 }
 
 func NewConnFactory(host string, port uint16, timeout time.Duration,
                     certfile, keyfile string, cafile string, hostname_check bool,
-                    tls_servername string, logger *CondLogger) (*ConnFactory, error) {
+                    tls_servername string, dialers uint, logger *CondLogger) (*ConnFactory, error) {
     if !hostname_check && cafile == "" {
         return nil, errors.New("Hostname check should not be disabled in absence of custom CA file")
     }
@@ -111,6 +113,7 @@ func NewConnFactory(host string, port uint16, timeout time.Duration,
         addr: net.JoinHostPort(host, strconv.Itoa(int(port))),
         tlsConfig: &tlsConfig,
         dialer: &net.Dialer{Timeout: timeout},
+        sem: semaphore.NewWeighted(int64(dialers)),
         logger: logger,
     }, nil
 }
@@ -123,6 +126,10 @@ type WrappedTLSConn struct {
 func (cf *ConnFactory) DialContext(ctx context.Context) (*WrappedTLSConn, error) {
     var newconn *tls.Conn
     var err error
+    if cf.sem.Acquire(ctx, 1) != nil {
+        return nil, errors.New("Context was cancelled")
+    }
+    defer cf.sem.Release(1)
     ch := make(chan struct{}, 1)
     go func () {
         newconn, err = tls.DialWithDialer(cf.dialer, "tcp", cf.addr, cf.tlsConfig)
