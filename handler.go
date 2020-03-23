@@ -50,7 +50,7 @@ func (h *ConnHandler) handle (ctx context.Context, c net.Conn) {
     h.logger.Info("Got new connection from %s", remote_addr)
 
     select {
-    case <-time.After(h.pool_wait):
+    case <-AfterWallClock(h.pool_wait):
         h.logger.Error("Timeout while waiting connection from pool")
         c.Close()
     case tlsconn := <-h.pool.Get(ctx):

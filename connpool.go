@@ -50,7 +50,7 @@ func (p *ConnPool) Start() {
 
 func (p *ConnPool) do_backoff() {
     select {
-    case <-time.After(p.backoff):
+    case <-AfterWallClock(p.backoff):
     case <-p.ctx.Done():
     }
 }
@@ -118,7 +118,7 @@ func (p *ConnPool) worker() {
                 p.kill_prepared(queue_id, watched, output_ch)
                 p.do_backoff()
             // Expired
-            case <-time.After(p.ttl):
+            case <-AfterWallClock(p.ttl):
                 p.logger.Debug("Connection %v seem to be expired", localaddr)
                 p.kill_prepared(queue_id, watched, output_ch)
             // Pool context cancelled
