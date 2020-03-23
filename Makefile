@@ -5,11 +5,13 @@ LDFLAGS = -ldflags '-s -w -extldflags "-static"'
 
 src = $(wildcard *.go)
 
+native: bin-native
 all: bin-linux-amd64 bin-linux-386 bin-linux-arm \
 	bin-freebsd-amd64 bin-freebsd-386 bin-freebsd-arm \
 	bin-darwin-amd64 \
 	bin-windows-amd64 bin-windows-386
 
+bin-native: $(OUTSUFFIX)
 bin-linux-amd64: $(OUTSUFFIX).linux-amd64
 bin-linux-386: $(OUTSUFFIX).linux-386
 bin-linux-arm: $(OUTSUFFIX).linux-arm
@@ -19,6 +21,9 @@ bin-freebsd-arm: $(OUTSUFFIX).freebsd-arm
 bin-darwin-amd64: $(OUTSUFFIX).darwin-amd64
 bin-windows-amd64: $(OUTSUFFIX).windows-amd64.exe
 bin-windows-386: $(OUTSUFFIX).windows-386.exe
+
+$(OUTSUFFIX): $(src)
+	CGO_ENABLED=0 go build $(BUILDOPTS) $(LDFLAGS) -o $@
 
 $(OUTSUFFIX).linux-amd64: $(src)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(BUILDOPTS) $(LDFLAGS) -o $@
