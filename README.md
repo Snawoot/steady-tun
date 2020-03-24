@@ -19,7 +19,9 @@ steady-tun can be used with custom CAs and/or mutual TLS auth with certificates.
 
 ## Installation
 
-From source:
+Pre-built binaries available on [releases](https://github.com/Snawoot/steady-tun/releases/latest) page.
+
+Alternatively, you may install steady-tun from source:
 
 ```
 go get github.com/Snawoot/steady-tun
