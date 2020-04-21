@@ -17,3 +17,5 @@ steady-tun
 steady-tun.*
 steady-tun.exe
 bin/
+
+*.snap

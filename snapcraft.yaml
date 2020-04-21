@@ -1,0 +1,21 @@
+name: steady-tun
+version: '1.0.0'
+summary: Secure TLS tunnel with pool of prepared upstream connections
+description: >
+  Secure TLS tunnel with pool of prepared upstream connections
+
+confinement: strict
+base: core18
+
+parts:
+  steady-tun:
+    plugin: go
+    go-importpath: github.com/Snawoot/steady-tun
+    source: .
+
+apps:
+  steady-tun:
+    command: bin/steady-tun
+    plugs:
+      - network
+      - network-bind
