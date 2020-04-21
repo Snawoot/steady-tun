@@ -1,5 +1,7 @@
 # steady-tun
 
+[![steady-tun](https://snapcraft.io//steady-tun/badge.svg)](https://snapcraft.io/steady-tun)
+
 Secure TLS tunnel with pool of prepared upstream connections
 
 Accepts TCP connections on listen port and forwards them, wrapped in TLS, to destination port. steady-tun maintains pool of fresh established TLS connections effectively cancelling delay caused by TLS handshake.
@@ -19,12 +21,24 @@ steady-tun can be used with custom CAs and/or mutual TLS auth with certificates.
 
 ## Installation
 
+#### Pre-built binaries
+
 Pre-built binaries available on [releases](https://github.com/Snawoot/steady-tun/releases/latest) page.
+
+#### From source
 
 Alternatively, you may install steady-tun from source:
 
 ```
 go get github.com/Snawoot/steady-tun
+```
+
+#### From Snap Store
+
+[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/steady-tun)
+
+```sh
+sudo snap install steady-tun
 ```
 
 ## Usage example
