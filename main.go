@@ -35,29 +35,55 @@ type CLIArgs struct {
     cert, key, cafile string
     hostname_check bool
     tls_servername string
+    flagset *flag.FlagSet
 }
 
 
-func parse_args() CLIArgs {
-    args := CLIArgs{}
-    flag.StringVar(&args.host, "dsthost", "", "destination server hostname")
-    flag.UintVar(&args.port, "dstport", 0, "destination server port")
-    flag.IntVar(&args.verbosity, "verbosity", 20, "logging verbosity " +
-            "(10 - debug, 20 - info, 30 - warning, 40 - error, 50 - critical)")
-    flag.StringVar(&args.bind_address, "bind-address", "127.0.0.1", "bind address")
-    flag.UintVar(&args.bind_port, "bind-port", 57800, "bind port")
-    flag.UintVar(&args.pool_size, "pool-size", 50, "connection pool size")
-    flag.UintVar(&args.dialers, "dialers", uint(runtime.GOMAXPROCS(0)), "concurrency limit for TLS connection attempts")
-    flag.DurationVar(&args.backoff, "backoff", 5 * time.Second, "delay between connection attempts")
-    flag.DurationVar(&args.ttl, "ttl", 30 * time.Second, "lifetime of idle pool connection in seconds")
-    flag.DurationVar(&args.timeout, "timeout", 4 * time.Second, "server connect timeout")
-    flag.DurationVar(&args.pool_wait, "pool-wait", 15 * time.Second, "timeout for acquiring connection from pool")
-    flag.StringVar(&args.cert, "cert", "", "use certificate for client TLS auth")
-    flag.StringVar(&args.key, "key", "", "key for TLS certificate")
-    flag.StringVar(&args.cafile, "cafile", "", "override default CA certs by specified in file")
-    flag.BoolVar(&args.hostname_check, "hostname-check", true, "check hostname in server cert subject")
-    flag.StringVar(&args.tls_servername, "tls-servername", "", "specifies hostname to expect in server cert")
-    flag.Parse()
+func NewCLIArgs() *CLIArgs {
+    args := CLIArgs{flagset: flag.NewFlagSet(os.Args[0], flag.ContinueOnError)}
+    args.flagset.StringVar(&args.host, "dsthost", "", "destination server hostname")
+    args.flagset.UintVar(&args.port, "dstport", 0, "destination server port")
+    args.flagset.IntVar(&args.verbosity, "verbosity", 20, "logging verbosity " +
+                        "(10 - debug, 20 - info, 30 - warning, 40 - error, 50 - critical)")
+    args.flagset.StringVar(&args.bind_address, "bind-address", "127.0.0.1", "bind address")
+    args.flagset.UintVar(&args.bind_port, "bind-port", 57800, "bind port")
+    args.flagset.UintVar(&args.pool_size, "pool-size", 50, "connection pool size")
+    args.flagset.UintVar(&args.dialers, "dialers", uint(runtime.GOMAXPROCS(0)), "concurrency limit for TLS connection attempts")
+    args.flagset.DurationVar(&args.backoff, "backoff", 5 * time.Second, "delay between connection attempts")
+    args.flagset.DurationVar(&args.ttl, "ttl", 30 * time.Second, "lifetime of idle pool connection in seconds")
+    args.flagset.DurationVar(&args.timeout, "timeout", 4 * time.Second, "server connect timeout")
+    args.flagset.DurationVar(&args.pool_wait, "pool-wait", 15 * time.Second, "timeout for acquiring connection from pool")
+    args.flagset.StringVar(&args.cert, "cert", "", "use certificate for client TLS auth")
+    args.flagset.StringVar(&args.key, "key", "", "key for TLS certificate")
+    args.flagset.StringVar(&args.cafile, "cafile", "", "override default CA certs by specified in file")
+    args.flagset.BoolVar(&args.hostname_check, "hostname-check", true, "check hostname in server cert subject")
+    args.flagset.StringVar(&args.tls_servername, "tls-servername", "", "specifies hostname to expect in server cert")
+    return &args
+}
+
+func parse_args() *CLIArgs {
+    args := NewCLIArgs()
+    pluginArgs, err := NewPluginArgs()
+    if err == nil {
+        opts := pluginArgs.ExportOptions()
+
+        if err := args.Update(opts); err != nil {
+            log.Printf("main: WARNING: CLIArgs.Update: %v", err)
+        }
+
+        if args.Server {
+            // args.Dst = pluginArgs.GetLocalAddr()
+            // args.Bind = pluginArgs.GetRemoteAddr()
+        } else {
+            // args.Bind = pluginArgs.GetLocalAddr()
+            // args.Dst = pluginArgs.GetRemoteAddr()
+        }
+    }
+    err = args.Update(os.Args[1:])
+    if err != nil {
+        log.Fatalf("main: args.Update: %v", err)
+    }
+
     if args.host == "" {
         arg_fail("Destination host argument is required!")
     }
