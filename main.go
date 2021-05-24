@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -39,6 +40,7 @@ type CLIArgs struct {
 	cert, key, cafile                string
 	hostname_check                   bool
 	tls_servername                   string
+	tlsSessionCache                  bool
 	showVersion                      bool
 }
 
@@ -61,6 +63,7 @@ func parse_args() CLIArgs {
 	flag.StringVar(&args.cafile, "cafile", "", "override default CA certs by specified in file")
 	flag.BoolVar(&args.hostname_check, "hostname-check", true, "check hostname in server cert subject")
 	flag.StringVar(&args.tls_servername, "tls-servername", "", "specifies hostname to expect in server cert")
+	flag.BoolVar(&args.tlsSessionCache, "tls-session-cache", true, "enable TLS session cache")
 	flag.BoolVar(&args.showVersion, "version", false, "show program version and exit")
 	flag.Parse()
 	if args.showVersion {
@@ -105,6 +108,11 @@ func main() {
 	poolLogger := NewCondLogger(log.New(logWriter, "POOL    : ", log.LstdFlags|log.Lshortfile),
 		args.verbosity)
 
+	var sessionCache tls.ClientSessionCache
+	if args.tlsSessionCache {
+		sessionCache = tls.NewLRUClientSessionCache(2 * int(args.pool_size))
+	}
+
 	connfactory, err := NewConnFactory(args.host,
 		uint16(args.port),
 		args.timeout,
@@ -114,6 +122,7 @@ func main() {
 		args.hostname_check,
 		args.tls_servername,
 		args.dialers,
+		sessionCache,
 		connLogger)
 	if err != nil {
 		panic(err)

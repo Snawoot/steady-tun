@@ -45,7 +45,7 @@ type ConnFactory struct {
 
 func NewConnFactory(host string, port uint16, timeout time.Duration,
 	certfile, keyfile string, cafile string, hostname_check bool,
-	tls_servername string, dialers uint, logger *CondLogger) (*ConnFactory, error) {
+	tls_servername string, dialers uint, sessionCache tls.ClientSessionCache, logger *CondLogger) (*ConnFactory, error) {
 	if !hostname_check && cafile == "" {
 		return nil, errors.New("Hostname check should not be disabled in absence of custom CA file")
 	}
@@ -76,9 +76,10 @@ func NewConnFactory(host string, port uint16, timeout time.Duration,
 		servername = tls_servername
 	}
 	tlsConfig := tls.Config{
-		RootCAs:      roots,
-		ServerName:   servername,
-		Certificates: certs,
+		RootCAs:            roots,
+		ServerName:         servername,
+		Certificates:       certs,
+		ClientSessionCache: sessionCache,
 	}
 	if !hostname_check {
 		tlsConfig.InsecureSkipVerify = true
