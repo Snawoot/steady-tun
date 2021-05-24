@@ -101,8 +101,12 @@ Usage of /home/user/go/bin/steady-tun:
     	server connect timeout (default 4s)
   -tls-servername string
     	specifies hostname to expect in server cert
+  -tls-session-cache
+    	enable TLS session cache (default true)
   -ttl duration
     	lifetime of idle pool connection in seconds (default 30s)
   -verbosity int
     	logging verbosity (10 - debug, 20 - info, 30 - warning, 40 - error, 50 - critical) (default 20)
+  -version
+    	show program version and exit
 ```
