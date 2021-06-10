@@ -54,6 +54,19 @@ go get github.com/Snawoot/steady-tun
 sudo snap install steady-tun
 ```
 
+#### Docker
+
+```sh
+docker run -it --rm -v certs:/certs -p 57800:57800 \
+    yarmak/steady-tun \
+    -dsthost proxy.example.com \
+    -dstport 443 \
+    -cert /certs/user.pem \
+    -key /certs/user.key \
+    -cafile /certs/ca.pem \
+    -ttl 300s
+```
+
 ## Usage example
 
 ```sh
