@@ -113,7 +113,7 @@ func main() {
 		sessionCache = tls.NewLRUClientSessionCache(2 * int(args.pool_size))
 	}
 
-	connfactory, err := NewConnFactory(args.host,
+	connfactory, err := NewTLSConnFactory(args.host,
 		uint16(args.port),
 		args.timeout,
 		args.cert,

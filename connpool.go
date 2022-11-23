@@ -7,10 +7,14 @@ import (
 	"time"
 )
 
+type ConnFactory interface {
+	DialContext(context.Context) (WrappedConn, error)
+}
+
 type ConnPool struct {
 	size              uint
 	ttl, backoff      time.Duration
-	connfactory       *ConnFactory
+	connfactory       ConnFactory
 	waiters, prepared *RAQueue
 	qmux              sync.Mutex
 	logger            *CondLogger
@@ -26,7 +30,7 @@ type watchedConn struct {
 }
 
 func NewConnPool(size uint, ttl, backoff time.Duration,
-	connfactory *ConnFactory, logger *CondLogger) *ConnPool {
+	connfactory ConnFactory, logger *CondLogger) *ConnPool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ConnPool{
 		size:        size,

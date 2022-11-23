@@ -1,6 +1,6 @@
 module github.com/Snawoot/steady-tun
 
-go 1.13
+go 1.17
 
 require (
 	github.com/huandu/skiplist v1.1.0
