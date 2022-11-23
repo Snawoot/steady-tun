@@ -62,6 +62,7 @@ func parse_args() CLIArgs {
 	flag.StringVar(&args.key, "key", "", "key for TLS certificate")
 	flag.StringVar(&args.cafile, "cafile", "", "override default CA certs by specified in file")
 	flag.BoolVar(&args.hostname_check, "hostname-check", true, "check hostname in server cert subject")
+	flag.StringVar(&args.tls_servername, "tls-servername", "", "SNI name to send. Default is to use ")
 	flag.StringVar(&args.tls_servername, "tls-servername", "", "specifies hostname to expect in server cert")
 	flag.BoolVar(&args.tlsSessionCache, "tls-session-cache", true, "enable TLS session cache")
 	flag.BoolVar(&args.showVersion, "version", false, "show program version and exit")

@@ -45,7 +45,7 @@ type ConnFactory struct {
 
 func NewConnFactory(host string, port uint16, timeout time.Duration,
 	certfile, keyfile string, cafile string, hostname_check bool,
-	tls_servername string, dialers uint, sessionCache tls.ClientSessionCache, logger *CondLogger) (*ConnFactory, error) {
+	tls_servername, tls_verifyname string, dialers uint, sessionCache tls.ClientSessionCache, logger *CondLogger) (*ConnFactory, error) {
 	if !hostname_check && cafile == "" {
 		return nil, errors.New("Hostname check should not be disabled in absence of custom CA file")
 	}
@@ -81,7 +81,10 @@ func NewConnFactory(host string, port uint16, timeout time.Duration,
 		Certificates:       certs,
 		ClientSessionCache: sessionCache,
 	}
-	if !hostname_check {
+	if !hostname_check || tls_verifyname != "" {
+		if !hostname_check {
+			tls_verifyname = ""
+		}
 		tlsConfig.InsecureSkipVerify = true
 		tlsConfig.VerifyPeerCertificate = func(certificates [][]byte, _ [][]*x509.Certificate) error {
 			certs := make([]*x509.Certificate, len(certificates))
@@ -95,7 +98,7 @@ func NewConnFactory(host string, port uint16, timeout time.Duration,
 
 			opts := x509.VerifyOptions{
 				Roots:         roots, // On the server side, use config.ClientCAs.
-				DNSName:       "",    // No hostname check
+				DNSName:       tls_verifyname,
 				Intermediates: x509.NewCertPool(),
 			}
 			for _, cert := range certs[1:] {
