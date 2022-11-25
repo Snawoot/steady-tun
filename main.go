@@ -41,6 +41,7 @@ type CLIArgs struct {
 	hostname_check                   bool
 	tls_servername                   string
 	tlsSessionCache                  bool
+	tlsEnabled                       bool
 	showVersion                      bool
 }
 
@@ -65,6 +66,7 @@ func parse_args() CLIArgs {
 	flag.StringVar(&args.tls_servername, "tls-servername", "", "specifies hostname to expect in server cert")
 	flag.BoolVar(&args.tlsSessionCache, "tls-session-cache", true, "enable TLS session cache")
 	flag.BoolVar(&args.showVersion, "version", false, "show program version and exit")
+	flag.BoolVar(&args.tlsEnabled, "tls-enabled", true, "enable TLS client for pool connections")
 	flag.Parse()
 	if args.showVersion {
 		return args
@@ -108,24 +110,31 @@ func main() {
 	poolLogger := NewCondLogger(log.New(logWriter, "POOL    : ", log.LstdFlags|log.Lshortfile),
 		args.verbosity)
 
-	var sessionCache tls.ClientSessionCache
-	if args.tlsSessionCache {
-		sessionCache = tls.NewLRUClientSessionCache(2 * int(args.pool_size))
-	}
-
-	connfactory, err := NewTLSConnFactory(args.host,
-		uint16(args.port),
-		args.timeout,
-		args.cert,
-		args.key,
-		args.cafile,
-		args.hostname_check,
-		args.tls_servername,
-		args.dialers,
-		sessionCache,
-		connLogger)
-	if err != nil {
-		panic(err)
+	var (
+		connfactory ConnFactory
+		err         error
+	)
+	if args.tlsEnabled {
+		var sessionCache tls.ClientSessionCache
+		if args.tlsSessionCache {
+			sessionCache = tls.NewLRUClientSessionCache(2 * int(args.pool_size))
+		}
+		connfactory, err = NewTLSConnFactory(args.host,
+			uint16(args.port),
+			args.timeout,
+			args.cert,
+			args.key,
+			args.cafile,
+			args.hostname_check,
+			args.tls_servername,
+			args.dialers,
+			sessionCache,
+			connLogger)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		connfactory = NewPlainConnFactory(args.host, uint16(args.port), args.timeout, connLogger)
 	}
 	pool := NewConnPool(args.pool_size, args.ttl, args.backoff, connfactory, poolLogger)
 	pool.Start()
