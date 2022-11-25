@@ -4,7 +4,7 @@
 
 Secure TLS tunnel with pool of prepared upstream connections
 
-Accepts TCP connections on listen port and forwards them, wrapped in TLS, to destination port. steady-tun maintains pool of fresh established TLS connections effectively cancelling delay caused by TLS handshake.
+Accepts TCP connections on listen port and forwards them, wrapped in TLS, to destination port. steady-tun maintains pool of fresh established TLS connections effectively cancelling delay caused by TLS handshake. Optionally it can be used as just TCP connection pool (option `-tls-enabled=false`).
 
 steady-tun may serve as drop-in replacement for stunnel or haproxy for purpose of secure tunneling of TCP connections. Thus, it is intended for use with stunnel or haproxy on server side, accepting TLS connections and forwarding them, for example, to SOCKS proxy. In such configuration make sure your server timeouts long enough to allow fit lifetime of idle client TLS sessions (-T option).
 
@@ -112,6 +112,8 @@ Usage of /home/user/go/bin/steady-tun:
     	timeout for acquiring connection from pool (default 15s)
   -timeout duration
     	server connect timeout (default 4s)
+  -tls-enabled
+    	enable TLS client for pool connections (default true)
   -tls-servername string
     	specifies hostname to expect in server cert
   -tls-session-cache
