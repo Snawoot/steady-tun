@@ -88,7 +88,7 @@ func (p *ConnPool) worker() {
 			case <-p.ctx.Done():
 				return
 			default:
-				p.logger.Error("Upstream connection error: %s", err)
+				p.logger.Error("Upstream connection error: %v", err)
 				p.do_backoff()
 				continue
 			}

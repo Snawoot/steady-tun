@@ -100,7 +100,7 @@ func (cf *TLSConnFactory) DialContext(ctx context.Context) (WrappedConn, error) 
 	defer cf.sem.Release(1)
 	netConn, err := cf.dialer.DialContext(ctx, "tcp", cf.addr)
 	if err != nil {
-		return nil, fmt.Errorf("cf.dialer.DialContext(ctx, \"tcp\", %q) failed: %v", err)
+		return nil, fmt.Errorf("cf.dialer.DialContext(ctx, \"tcp\", %q) failed: %v", cf.addr, err)
 	}
 	tlsConn := tls.Client(netConn, cf.tlsConfig)
 	err = tlsConn.HandshakeContext(ctx)
