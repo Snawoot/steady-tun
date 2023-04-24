@@ -1,5 +1,5 @@
 name: steady-tun
-version: '1.2.0'
+version: '1.2.1'
 summary: Secure TLS tunnel with pool of prepared upstream connections
 description: >
   Secure TLS tunnel with pool of prepared upstream connections
