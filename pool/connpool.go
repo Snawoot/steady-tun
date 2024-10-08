@@ -1,23 +1,28 @@
-package main
+package pool
 
 import (
 	"context"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/Snawoot/steady-tun/clock"
+	"github.com/Snawoot/steady-tun/conn"
+	clog "github.com/Snawoot/steady-tun/log"
+	"github.com/Snawoot/steady-tun/queue"
 )
 
 type ConnFactory interface {
-	DialContext(context.Context) (WrappedConn, error)
+	DialContext(context.Context) (conn.WrappedConn, error)
 }
 
 type ConnPool struct {
 	size              uint
 	ttl, backoff      time.Duration
 	connfactory       ConnFactory
-	waiters, prepared *RAQueue
+	waiters, prepared *queue.RAQueue
 	qmux              sync.Mutex
-	logger            *CondLogger
+	logger            *clog.CondLogger
 	ctx               context.Context
 	cancel            context.CancelFunc
 	shutdown          sync.WaitGroup
@@ -30,15 +35,15 @@ type watchedConn struct {
 }
 
 func NewConnPool(size uint, ttl, backoff time.Duration,
-	connfactory ConnFactory, logger *CondLogger) *ConnPool {
+	connfactory ConnFactory, logger *clog.CondLogger) *ConnPool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ConnPool{
 		size:        size,
 		ttl:         ttl,
 		backoff:     backoff,
 		connfactory: connfactory,
-		waiters:     NewRAQueue(),
-		prepared:    NewRAQueue(),
+		waiters:     queue.NewRAQueue(),
+		prepared:    queue.NewRAQueue(),
 		logger:      logger,
 		ctx:         ctx,
 		cancel:      cancel,
@@ -54,7 +59,7 @@ func (p *ConnPool) Start() {
 
 func (p *ConnPool) do_backoff() {
 	select {
-	case <-AfterWallClock(p.backoff):
+	case <-clock.AfterWallClock(p.backoff):
 	case <-p.ctx.Done():
 	}
 }
@@ -122,7 +127,7 @@ func (p *ConnPool) worker() {
 				p.kill_prepared(queue_id, watched, output_ch)
 				p.do_backoff()
 			// Expired
-			case <-AfterWallClock(p.ttl):
+			case <-clock.AfterWallClock(p.ttl):
 				p.logger.Debug("Connection %v seem to be expired", localaddr)
 				p.kill_prepared(queue_id, watched, output_ch)
 			// Pool context cancelled

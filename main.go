@@ -10,6 +10,11 @@ import (
 	"runtime"
 	"syscall"
 	"time"
+
+	conn "github.com/Snawoot/steady-tun/conn"
+	clog "github.com/Snawoot/steady-tun/log"
+	"github.com/Snawoot/steady-tun/pool"
+	"github.com/Snawoot/steady-tun/server"
 )
 
 var (
@@ -96,22 +101,22 @@ func main() {
 		return
 	}
 
-	logWriter := NewLogWriter(os.Stderr)
+	logWriter := clog.NewLogWriter(os.Stderr)
 	defer logWriter.Close()
 
-	mainLogger := NewCondLogger(log.New(logWriter, "MAIN    : ", log.LstdFlags|log.Lshortfile),
+	mainLogger := clog.NewCondLogger(log.New(logWriter, "MAIN    : ", log.LstdFlags|log.Lshortfile),
 		args.verbosity)
-	listenerLogger := NewCondLogger(log.New(logWriter, "LISTENER: ", log.LstdFlags|log.Lshortfile),
+	listenerLogger := clog.NewCondLogger(log.New(logWriter, "LISTENER: ", log.LstdFlags|log.Lshortfile),
 		args.verbosity)
-	handlerLogger := NewCondLogger(log.New(logWriter, "HANDLER : ", log.LstdFlags|log.Lshortfile),
+	handlerLogger := clog.NewCondLogger(log.New(logWriter, "HANDLER : ", log.LstdFlags|log.Lshortfile),
 		args.verbosity)
-	connLogger := NewCondLogger(log.New(logWriter, "CONN    : ", log.LstdFlags|log.Lshortfile),
+	connLogger := clog.NewCondLogger(log.New(logWriter, "CONN    : ", log.LstdFlags|log.Lshortfile),
 		args.verbosity)
-	poolLogger := NewCondLogger(log.New(logWriter, "POOL    : ", log.LstdFlags|log.Lshortfile),
+	poolLogger := clog.NewCondLogger(log.New(logWriter, "POOL    : ", log.LstdFlags|log.Lshortfile),
 		args.verbosity)
 
 	var (
-		connfactory ConnFactory
+		connfactory pool.ConnFactory
 		err         error
 	)
 	if args.tlsEnabled {
@@ -119,7 +124,7 @@ func main() {
 		if args.tlsSessionCache {
 			sessionCache = tls.NewLRUClientSessionCache(2 * int(args.pool_size))
 		}
-		connfactory, err = NewTLSConnFactory(args.host,
+		connfactory, err = conn.NewTLSConnFactory(args.host,
 			uint16(args.port),
 			args.timeout,
 			args.cert,
@@ -134,15 +139,15 @@ func main() {
 			panic(err)
 		}
 	} else {
-		connfactory = NewPlainConnFactory(args.host, uint16(args.port), args.timeout, connLogger)
+		connfactory = conn.NewPlainConnFactory(args.host, uint16(args.port), args.timeout)
 	}
-	pool := NewConnPool(args.pool_size, args.ttl, args.backoff, connfactory, poolLogger)
-	pool.Start()
-	defer pool.Stop()
+	connPool := pool.NewConnPool(args.pool_size, args.ttl, args.backoff, connfactory, poolLogger)
+	connPool.Start()
+	defer connPool.Stop()
 
-	listener := NewTCPListener(args.bind_address,
+	listener := server.NewTCPListener(args.bind_address,
 		uint16(args.bind_port),
-		NewConnHandler(pool, args.pool_wait, handlerLogger).handle,
+		server.NewConnHandler(connPool, args.pool_wait, handlerLogger).Handle,
 		listenerLogger)
 	if err := listener.Start(); err != nil {
 		panic(err)

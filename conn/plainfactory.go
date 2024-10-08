@@ -1,4 +1,4 @@
-package main
+package conn
 
 import (
 	"context"
@@ -11,14 +11,12 @@ import (
 type PlainConnFactory struct {
 	addr   string
 	dialer *net.Dialer
-	logger *CondLogger
 }
 
-func NewPlainConnFactory(host string, port uint16, timeout time.Duration, logger *CondLogger) *PlainConnFactory {
+func NewPlainConnFactory(host string, port uint16, timeout time.Duration) *PlainConnFactory {
 	return &PlainConnFactory{
 		addr:   net.JoinHostPort(host, strconv.Itoa(int(port))),
 		dialer: &net.Dialer{Timeout: timeout},
-		logger: logger,
 	}
 }
 
@@ -28,7 +26,6 @@ func (cf *PlainConnFactory) DialContext(ctx context.Context) (WrappedConn, error
 		return nil, fmt.Errorf("cf.dialer.DialContext(ctx, \"tcp\", %q) failed: %v", cf.addr, err)
 	}
 	return &wrappedConn{
-		conn:   conn,
-		logger: cf.logger,
+		conn: conn,
 	}, nil
 }
