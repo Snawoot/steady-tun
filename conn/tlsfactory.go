@@ -1,4 +1,4 @@
-package main
+package conn
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
+
+	clog "github.com/Snawoot/steady-tun/log"
 )
 
 type TLSConnFactory struct {
@@ -19,12 +21,11 @@ type TLSConnFactory struct {
 	tlsConfig *tls.Config
 	dialer    *net.Dialer
 	sem       *semaphore.Weighted
-	logger    *CondLogger
 }
 
 func NewTLSConnFactory(host string, port uint16, timeout time.Duration,
 	certfile, keyfile string, cafile string, hostname_check bool,
-	tls_servername string, dialers uint, sessionCache tls.ClientSessionCache, logger *CondLogger) (*TLSConnFactory, error) {
+	tls_servername string, dialers uint, sessionCache tls.ClientSessionCache, logger *clog.CondLogger) (*TLSConnFactory, error) {
 	if !hostname_check && cafile == "" {
 		return nil, errors.New("Hostname check should not be disabled in absence of custom CA file")
 	}
@@ -89,7 +90,6 @@ func NewTLSConnFactory(host string, port uint16, timeout time.Duration,
 		tlsConfig: &tlsConfig,
 		dialer:    &net.Dialer{Timeout: timeout},
 		sem:       semaphore.NewWeighted(int64(dialers)),
-		logger:    logger,
 	}, nil
 }
 
@@ -109,7 +109,6 @@ func (cf *TLSConnFactory) DialContext(ctx context.Context) (WrappedConn, error) 
 		return nil, fmt.Errorf("tlsConn.HandshakeContext(ctx) failed: %v", err)
 	}
 	return &wrappedConn{
-		conn:   tlsConn,
-		logger: cf.logger,
+		conn: tlsConn,
 	}, nil
 }

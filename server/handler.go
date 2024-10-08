@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -6,15 +6,19 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/Snawoot/steady-tun/clock"
+	clog "github.com/Snawoot/steady-tun/log"
+	"github.com/Snawoot/steady-tun/pool"
 )
 
 type ConnHandler struct {
-	pool      *ConnPool
+	pool      *pool.ConnPool
 	pool_wait time.Duration
-	logger    *CondLogger
+	logger    *clog.CondLogger
 }
 
-func NewConnHandler(pool *ConnPool, pool_wait time.Duration, logger *CondLogger) *ConnHandler {
+func NewConnHandler(pool *pool.ConnPool, pool_wait time.Duration, logger *clog.CondLogger) *ConnHandler {
 	return &ConnHandler{pool, pool_wait, logger}
 }
 
@@ -45,12 +49,12 @@ func (h *ConnHandler) proxy(ctx context.Context, left, right net.Conn) {
 	return
 }
 
-func (h *ConnHandler) handle(ctx context.Context, c net.Conn) {
+func (h *ConnHandler) Handle(ctx context.Context, c net.Conn) {
 	remote_addr := c.RemoteAddr()
 	h.logger.Info("Got new connection from %s", remote_addr)
 
 	select {
-	case <-AfterWallClock(h.pool_wait):
+	case <-clock.AfterWallClock(h.pool_wait):
 		h.logger.Error("Timeout while waiting connection from pool")
 		c.Close()
 	case tlsconn := <-h.pool.Get(ctx):

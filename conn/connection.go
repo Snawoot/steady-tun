@@ -1,4 +1,4 @@
-package main
+package conn
 
 import (
 	"context"
@@ -22,8 +22,7 @@ type WrappedConn interface {
 }
 
 type wrappedConn struct {
-	conn   net.Conn
-	logger *CondLogger
+	conn net.Conn
 }
 
 func (c *wrappedConn) Read(p []byte) (n int, err error) {

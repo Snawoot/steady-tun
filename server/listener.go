@@ -1,9 +1,11 @@
-package main
+package server
 
 import (
 	"context"
 	"net"
 	"sync"
+
+	clog "github.com/Snawoot/steady-tun/log"
 )
 
 type HandlerFunc func(context.Context, net.Conn)
@@ -14,14 +16,14 @@ type TCPListener struct {
 	handler    HandlerFunc
 	quitaccept chan struct{}
 	listener   *net.TCPListener
-	logger     *CondLogger
+	logger     *clog.CondLogger
 	ctx        context.Context
 	cancel     context.CancelFunc
 	shutdown   sync.WaitGroup
 }
 
 func NewTCPListener(address string, port uint16, handler HandlerFunc,
-	logger *CondLogger) *TCPListener {
+	logger *clog.CondLogger) *TCPListener {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TCPListener{
 		address:    address,
