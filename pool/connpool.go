@@ -14,15 +14,15 @@ import (
 type ConnFactory = func(context.Context) (net.Conn, error)
 
 type ConnPool struct {
-	size              uint
-	ttl, backoff      time.Duration
-	connFactory       ConnFactory
-	waiters, prepared *queue.RAQueue
-	qmux              sync.Mutex
-	logger            *clog.CondLogger
-	ctx               context.Context
-	cancel            context.CancelFunc
-	shutdown          sync.WaitGroup
+	size         uint
+	ttl, backoff time.Duration
+	connFactory  ConnFactory
+	prepared     *queue.RAQueue
+	qmux         sync.Mutex
+	logger       *clog.CondLogger
+	ctx          context.Context
+	cancel       context.CancelFunc
+	shutdown     sync.WaitGroup
 }
 
 type watchedConn struct {
@@ -39,7 +39,6 @@ func NewConnPool(size uint, ttl, backoff time.Duration,
 		ttl:         ttl,
 		backoff:     backoff,
 		connFactory: connFactory,
-		waiters:     queue.NewRAQueue(),
 		prepared:    queue.NewRAQueue(),
 		logger:      logger,
 		ctx:         ctx,
@@ -99,72 +98,48 @@ func (p *ConnPool) worker() {
 		p.logger.Debug("Established upstream connection %v", localaddr)
 
 		p.qmux.Lock()
-		waiter := p.waiters.Pop()
-		if waiter != nil {
-			p.qmux.Unlock()
-			waiter.(chan net.Conn) <- conn
-			p.logger.Warning("Pool connection delivered directly to waiter")
-		} else {
-			queue_id := p.prepared.Push(output_ch)
-			p.qmux.Unlock()
-			readctx, readcancel := context.WithCancel(p.ctx)
-			readdone := make(chan struct{}, 1)
-			go func() {
-				connReadContext(readctx, conn, dummybuf)
-				close(readdone)
-			}()
-			watched := &watchedConn{conn, readcancel, readdone}
-			select {
-			// Connection delivered via queue
-			case output_ch <- watched:
-				p.logger.Debug("Pool connection %v delivered via queue", localaddr)
-			// Connection disrupted
-			case <-readdone:
-				p.logger.Debug("Pool connection %v was disrupted", localaddr)
-				p.kill_prepared(queue_id, watched, output_ch)
-				p.do_backoff()
-			// Expired
-			case <-clock.AfterWallClock(p.ttl):
-				p.logger.Debug("Connection %v seem to be expired", localaddr)
-				p.kill_prepared(queue_id, watched, output_ch)
-			// Pool context cancelled
-			case <-p.ctx.Done():
-				conn.Close()
-			}
+		queue_id := p.prepared.Push(output_ch)
+		p.qmux.Unlock()
+		readctx, readcancel := context.WithCancel(p.ctx)
+		readdone := make(chan struct{}, 1)
+		go func() {
+			connReadContext(readctx, conn, dummybuf)
+			close(readdone)
+		}()
+		watched := &watchedConn{conn, readcancel, readdone}
+		select {
+		// Connection delivered via queue
+		case output_ch <- watched:
+			p.logger.Debug("Pool connection %v delivered via queue", localaddr)
+		// Connection disrupted
+		case <-readdone:
+			p.logger.Debug("Pool connection %v was disrupted", localaddr)
+			p.kill_prepared(queue_id, watched, output_ch)
+			p.do_backoff()
+		// Expired
+		case <-clock.AfterWallClock(p.ttl):
+			p.logger.Debug("Connection %v seem to be expired", localaddr)
+			p.kill_prepared(queue_id, watched, output_ch)
+		// Pool context cancelled
+		case <-p.ctx.Done():
+			conn.Close()
 		}
 	}
 }
 
-func (p *ConnPool) Get(ctx context.Context) chan net.Conn {
-	out := make(chan net.Conn, 1)
+func (p *ConnPool) Get(ctx context.Context) (net.Conn, error) {
 	p.qmux.Lock()
 	free := p.prepared.Pop()
+	p.qmux.Unlock()
 	if free == nil {
-		waiter_ch := make(chan net.Conn, 1)
-		queue_id := p.waiters.Push(waiter_ch)
-		p.qmux.Unlock()
-		go func() {
-			select {
-			case <-ctx.Done():
-				out <- nil
-				// Try to remove conn request from waiter queue
-				p.qmux.Lock()
-				p.waiters.Delete(queue_id)
-				p.qmux.Unlock()
-			case <-p.ctx.Done():
-				out <- nil
-			case conn := <-waiter_ch:
-				out <- conn
-			}
-		}()
+		p.logger.Warning("pool shortage! calling factory directly!")
+		return p.connFactory(ctx)
 	} else {
-		p.qmux.Unlock()
 		watched := <-(free.(chan *watchedConn))
 		watched.cancel()
 		<-watched.canceldone
-		out <- watched.conn
+		return watched.conn, nil
 	}
-	return out
 }
 
 func (p *ConnPool) Stop() {
