@@ -22,6 +22,8 @@ type TLSConnFactory struct {
 	sem       *semaphore.Weighted
 }
 
+var _ Factory = &TLSConnFactory{}
+
 func NewTLSConnFactory(host string, port uint16, dialer ContextDialer,
 	certfile, keyfile string, cafile string, hostname_check bool,
 	tls_servername string, dialers uint, sessionCache tls.ClientSessionCache, logger *clog.CondLogger) (*TLSConnFactory, error) {
@@ -92,7 +94,7 @@ func NewTLSConnFactory(host string, port uint16, dialer ContextDialer,
 	}, nil
 }
 
-func (cf *TLSConnFactory) DialContext(ctx context.Context) (WrappedConn, error) {
+func (cf *TLSConnFactory) DialContext(ctx context.Context) (net.Conn, error) {
 	if cf.sem.Acquire(ctx, 1) != nil {
 		return nil, errors.New("Context was cancelled")
 	}
@@ -107,7 +109,5 @@ func (cf *TLSConnFactory) DialContext(ctx context.Context) (WrappedConn, error) 
 		netConn.Close()
 		return nil, fmt.Errorf("tlsConn.HandshakeContext(ctx) failed: %v", err)
 	}
-	return &wrappedConn{
-		conn: tlsConn,
-	}, nil
+	return tlsConn, nil
 }
