@@ -7,19 +7,16 @@ import (
 	"time"
 
 	"github.com/Snawoot/steady-tun/clock"
-	"github.com/Snawoot/steady-tun/conn"
 	clog "github.com/Snawoot/steady-tun/log"
 	"github.com/Snawoot/steady-tun/queue"
 )
 
-type ConnFactory interface {
-	DialContext(context.Context) (conn.WrappedConn, error)
-}
+type ConnFactory = func(context.Context) (net.Conn, error)
 
 type ConnPool struct {
 	size              uint
 	ttl, backoff      time.Duration
-	connfactory       ConnFactory
+	connFactory       ConnFactory
 	waiters, prepared *queue.RAQueue
 	qmux              sync.Mutex
 	logger            *clog.CondLogger
@@ -35,13 +32,13 @@ type watchedConn struct {
 }
 
 func NewConnPool(size uint, ttl, backoff time.Duration,
-	connfactory ConnFactory, logger *clog.CondLogger) *ConnPool {
+	connFactory ConnFactory, logger *clog.CondLogger) *ConnPool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ConnPool{
 		size:        size,
 		ttl:         ttl,
 		backoff:     backoff,
-		connfactory: connfactory,
+		connFactory: connFactory,
 		waiters:     queue.NewRAQueue(),
 		prepared:    queue.NewRAQueue(),
 		logger:      logger,
@@ -87,7 +84,7 @@ func (p *ConnPool) worker() {
 			return
 		default:
 		}
-		conn, err := p.connfactory.DialContext(p.ctx)
+		conn, err := p.connFactory(p.ctx)
 		if err != nil {
 			select {
 			case <-p.ctx.Done():
@@ -113,8 +110,8 @@ func (p *ConnPool) worker() {
 			readctx, readcancel := context.WithCancel(p.ctx)
 			readdone := make(chan struct{}, 1)
 			go func() {
-				conn.ReadContext(readctx, dummybuf)
-				readdone <- struct{}{}
+				connReadContext(readctx, conn, dummybuf)
+				close(readdone)
 			}()
 			watched := &watchedConn{conn, readcancel, readdone}
 			select {
@@ -173,4 +170,20 @@ func (p *ConnPool) Get(ctx context.Context) chan net.Conn {
 func (p *ConnPool) Stop() {
 	p.cancel()
 	p.shutdown.Wait()
+}
+
+func connReadContext(ctx context.Context, conn net.Conn, p []byte) (n int, err error) {
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		n, err = conn.Read(p)
+	}()
+	select {
+	case <-ctx.Done():
+		conn.SetReadDeadline(time.Unix(0, 0))
+		<-readDone
+		conn.SetReadDeadline(time.Time{})
+	case <-readDone:
+	}
+	return
 }

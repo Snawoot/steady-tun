@@ -121,7 +121,7 @@ func main() {
 
 	var (
 		dialer      conn.ContextDialer
-		connfactory pool.ConnFactory
+		connfactory conn.Factory
 		err         error
 	)
 	dialer = (&net.Dialer{
@@ -154,7 +154,7 @@ func main() {
 	} else {
 		connfactory = conn.NewPlainConnFactory(args.host, uint16(args.port), dialer)
 	}
-	connPool := pool.NewConnPool(args.pool_size, args.ttl, args.backoff, connfactory, poolLogger)
+	connPool := pool.NewConnPool(args.pool_size, args.ttl, args.backoff, connfactory.DialContext, poolLogger)
 	connPool.Start()
 	defer connPool.Stop()
 
