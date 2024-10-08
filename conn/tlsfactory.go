@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net"
 	"strconv"
-	"time"
 
 	"golang.org/x/sync/semaphore"
 
@@ -19,11 +18,11 @@ import (
 type TLSConnFactory struct {
 	addr      string
 	tlsConfig *tls.Config
-	dialer    *net.Dialer
+	dialer    ContextDialer
 	sem       *semaphore.Weighted
 }
 
-func NewTLSConnFactory(host string, port uint16, timeout time.Duration,
+func NewTLSConnFactory(host string, port uint16, dialer ContextDialer,
 	certfile, keyfile string, cafile string, hostname_check bool,
 	tls_servername string, dialers uint, sessionCache tls.ClientSessionCache, logger *clog.CondLogger) (*TLSConnFactory, error) {
 	if !hostname_check && cafile == "" {
@@ -88,7 +87,7 @@ func NewTLSConnFactory(host string, port uint16, timeout time.Duration,
 	return &TLSConnFactory{
 		addr:      net.JoinHostPort(host, strconv.Itoa(int(port))),
 		tlsConfig: &tlsConfig,
-		dialer:    &net.Dialer{Timeout: timeout},
+		dialer:    dialer,
 		sem:       semaphore.NewWeighted(int64(dialers)),
 	}, nil
 }
@@ -98,7 +97,7 @@ func (cf *TLSConnFactory) DialContext(ctx context.Context) (WrappedConn, error) 
 		return nil, errors.New("Context was cancelled")
 	}
 	defer cf.sem.Release(1)
-	netConn, err := cf.dialer.DialContext(ctx, "tcp", cf.addr)
+	netConn, err := cf.dialer(ctx, "tcp", cf.addr)
 	if err != nil {
 		return nil, fmt.Errorf("cf.dialer.DialContext(ctx, \"tcp\", %q) failed: %v", cf.addr, err)
 	}

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -116,9 +117,14 @@ func main() {
 		args.verbosity)
 
 	var (
+		dialer      conn.ContextDialer
 		connfactory pool.ConnFactory
 		err         error
 	)
+	dialer = (&net.Dialer{
+		Timeout: args.timeout,
+	}).DialContext
+
 	if args.tlsEnabled {
 		var sessionCache tls.ClientSessionCache
 		if args.tlsSessionCache {
@@ -126,7 +132,7 @@ func main() {
 		}
 		connfactory, err = conn.NewTLSConnFactory(args.host,
 			uint16(args.port),
-			args.timeout,
+			dialer,
 			args.cert,
 			args.key,
 			args.cafile,
@@ -139,7 +145,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		connfactory = conn.NewPlainConnFactory(args.host, uint16(args.port), args.timeout)
+		connfactory = conn.NewPlainConnFactory(args.host, uint16(args.port), dialer)
 	}
 	connPool := pool.NewConnPool(args.pool_size, args.ttl, args.backoff, connfactory, poolLogger)
 	connPool.Start()
