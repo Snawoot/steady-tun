@@ -13,6 +13,7 @@ import (
 	"time"
 
 	conn "github.com/Snawoot/steady-tun/conn"
+	"github.com/Snawoot/steady-tun/dnscache"
 	clog "github.com/Snawoot/steady-tun/log"
 	"github.com/Snawoot/steady-tun/pool"
 	"github.com/Snawoot/steady-tun/server"
@@ -48,6 +49,7 @@ type CLIArgs struct {
 	tls_servername                   string
 	tlsSessionCache                  bool
 	tlsEnabled                       bool
+	dnsCacheTTL                      time.Duration
 	showVersion                      bool
 }
 
@@ -73,6 +75,7 @@ func parse_args() CLIArgs {
 	flag.BoolVar(&args.tlsSessionCache, "tls-session-cache", true, "enable TLS session cache")
 	flag.BoolVar(&args.showVersion, "version", false, "show program version and exit")
 	flag.BoolVar(&args.tlsEnabled, "tls-enabled", true, "enable TLS client for pool connections")
+	flag.DurationVar(&args.dnsCacheTTL, "dns-cache-ttl", 30*time.Second, "DNS cache TTL")
 	flag.Parse()
 	if args.showVersion {
 		return args
@@ -124,6 +127,10 @@ func main() {
 	dialer = (&net.Dialer{
 		Timeout: args.timeout,
 	}).DialContext
+
+	if args.dnsCacheTTL > 0 {
+		dialer = dnscache.WrapDialer(dialer, 1, args.dnsCacheTTL)
+	}
 
 	if args.tlsEnabled {
 		var sessionCache tls.ClientSessionCache
