@@ -97,7 +97,7 @@ Usage of /home/user/go/bin/steady-tun:
   -cert string
     	use certificate for client TLS auth
   -dialers uint
-    	concurrency limit for TLS connection attempts (default 2)
+    	concurrency limit for TLS connection attempts (default 16)
   -dsthost string
     	destination server hostname
   -dstport uint
