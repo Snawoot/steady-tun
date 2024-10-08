@@ -97,7 +97,7 @@ Usage of /home/user/go/bin/steady-tun:
   -cert string
     	use certificate for client TLS auth
   -dialers uint
-    	concurrency limit for TLS connection attempts (default 2)
+    	concurrency limit for TLS connection attempts (default 16)
   -dsthost string
     	destination server hostname
   -dstport uint
@@ -108,8 +108,6 @@ Usage of /home/user/go/bin/steady-tun:
     	key for TLS certificate
   -pool-size uint
     	connection pool size (default 50)
-  -pool-wait duration
-    	timeout for acquiring connection from pool (default 15s)
   -timeout duration
     	server connect timeout (default 4s)
   -tls-enabled

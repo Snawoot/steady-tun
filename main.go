@@ -36,21 +36,21 @@ func arg_fail(msg string) {
 }
 
 type CLIArgs struct {
-	host                             string
-	port                             uint
-	verbosity                        int
-	bind_address                     string
-	bind_port                        uint
-	pool_size                        uint
-	dialers                          uint
-	backoff, ttl, timeout, pool_wait time.Duration
-	cert, key, cafile                string
-	hostname_check                   bool
-	tls_servername                   string
-	tlsSessionCache                  bool
-	tlsEnabled                       bool
-	dnsCacheTTL                      time.Duration
-	showVersion                      bool
+	host                  string
+	port                  uint
+	verbosity             int
+	bind_address          string
+	bind_port             uint
+	pool_size             uint
+	dialers               uint
+	backoff, ttl, timeout time.Duration
+	cert, key, cafile     string
+	hostname_check        bool
+	tls_servername        string
+	tlsSessionCache       bool
+	tlsEnabled            bool
+	dnsCacheTTL           time.Duration
+	showVersion           bool
 }
 
 func parse_args() CLIArgs {
@@ -62,11 +62,10 @@ func parse_args() CLIArgs {
 	flag.StringVar(&args.bind_address, "bind-address", "127.0.0.1", "bind address")
 	flag.UintVar(&args.bind_port, "bind-port", 57800, "bind port")
 	flag.UintVar(&args.pool_size, "pool-size", 50, "connection pool size")
-	flag.UintVar(&args.dialers, "dialers", uint(runtime.GOMAXPROCS(0)), "concurrency limit for TLS connection attempts")
+	flag.UintVar(&args.dialers, "dialers", uint(4*runtime.GOMAXPROCS(0)), "concurrency limit for TLS connection attempts")
 	flag.DurationVar(&args.backoff, "backoff", 5*time.Second, "delay between connection attempts")
 	flag.DurationVar(&args.ttl, "ttl", 30*time.Second, "lifetime of idle pool connection in seconds")
 	flag.DurationVar(&args.timeout, "timeout", 4*time.Second, "server connect timeout")
-	flag.DurationVar(&args.pool_wait, "pool-wait", 15*time.Second, "timeout for acquiring connection from pool")
 	flag.StringVar(&args.cert, "cert", "", "use certificate for client TLS auth")
 	flag.StringVar(&args.key, "key", "", "key for TLS certificate")
 	flag.StringVar(&args.cafile, "cafile", "", "override default CA certs by specified in file")
@@ -160,7 +159,7 @@ func main() {
 
 	listener := server.NewTCPListener(args.bind_address,
 		uint16(args.bind_port),
-		server.NewConnHandler(connPool, args.pool_wait, handlerLogger).Handle,
+		server.NewConnHandler(connPool, handlerLogger).Handle,
 		listenerLogger)
 	if err := listener.Start(); err != nil {
 		panic(err)
