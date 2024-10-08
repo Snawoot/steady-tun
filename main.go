@@ -62,7 +62,7 @@ func parse_args() CLIArgs {
 	flag.StringVar(&args.bind_address, "bind-address", "127.0.0.1", "bind address")
 	flag.UintVar(&args.bind_port, "bind-port", 57800, "bind port")
 	flag.UintVar(&args.pool_size, "pool-size", 50, "connection pool size")
-	flag.UintVar(&args.dialers, "dialers", uint(runtime.GOMAXPROCS(0)), "concurrency limit for TLS connection attempts")
+	flag.UintVar(&args.dialers, "dialers", uint(4*runtime.GOMAXPROCS(0)), "concurrency limit for TLS connection attempts")
 	flag.DurationVar(&args.backoff, "backoff", 5*time.Second, "delay between connection attempts")
 	flag.DurationVar(&args.ttl, "ttl", 30*time.Second, "lifetime of idle pool connection in seconds")
 	flag.DurationVar(&args.timeout, "timeout", 4*time.Second, "server connect timeout")
