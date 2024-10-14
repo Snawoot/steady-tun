@@ -55,6 +55,7 @@ func (h *ConnHandler) Handle(ctx context.Context, c net.Conn) {
 	if err != nil {
 		h.logger.Error("Error on connection retrieve from pool: %v", err)
 		c.Close()
+		return
 	}
 	h.proxy(ctx, c, tlsconn)
 }

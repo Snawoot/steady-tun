@@ -101,7 +101,7 @@ func (p *ConnPool) worker() {
 		queue_id := p.prepared.Push(output_ch)
 		p.qmux.Unlock()
 		readctx, readcancel := context.WithCancel(p.ctx)
-		readdone := make(chan struct{}, 1)
+		readdone := make(chan struct{})
 		go func() {
 			connReadContext(readctx, conn, dummybuf)
 			close(readdone)
