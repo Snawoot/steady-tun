@@ -50,6 +50,7 @@ type CLIArgs struct {
 	tlsSessionCache       bool
 	tlsEnabled            bool
 	dnsCacheTTL           time.Duration
+	dnsNegCacheTTL        time.Duration
 	showVersion           bool
 }
 
@@ -75,6 +76,7 @@ func parse_args() CLIArgs {
 	flag.BoolVar(&args.showVersion, "version", false, "show program version and exit")
 	flag.BoolVar(&args.tlsEnabled, "tls-enabled", true, "enable TLS client for pool connections")
 	flag.DurationVar(&args.dnsCacheTTL, "dns-cache-ttl", 30*time.Second, "DNS cache TTL")
+	flag.DurationVar(&args.dnsNegCacheTTL, "dns-neg-cache-ttl", 1*time.Second, "negative DNS cache TTL")
 	flag.Parse()
 	if args.showVersion {
 		return args
@@ -128,7 +130,7 @@ func main() {
 	}).DialContext
 
 	if args.dnsCacheTTL > 0 {
-		dialer = dnscache.WrapDialer(dialer, 1, args.dnsCacheTTL)
+		dialer = dnscache.WrapDialer(dialer, net.DefaultResolver, 128, args.dnsCacheTTL, args.dnsNegCacheTTL, args.timeout)
 	}
 
 	if args.tlsEnabled {
