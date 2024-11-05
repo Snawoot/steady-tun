@@ -85,7 +85,7 @@ Command in this example will start forwarding TCP connections from default local
 
 ```
 $ ~/go/bin/steady-tun -h
-Usage of /home/user/go/bin/steady-tun:
+Usage of steady-tun:
   -backoff duration
     	delay between connection attempts (default 5s)
   -bind-address string
@@ -98,6 +98,10 @@ Usage of /home/user/go/bin/steady-tun:
     	use certificate for client TLS auth
   -dialers uint
     	concurrency limit for TLS connection attempts (default 16)
+  -dns-cache-ttl duration
+    	DNS cache TTL (default 30s)
+  -dns-neg-cache-ttl duration
+    	negative DNS cache TTL (default 1s)
   -dsthost string
     	destination server hostname
   -dstport uint
