@@ -43,7 +43,7 @@ Pre-built binaries available on [releases](https://github.com/Snawoot/steady-tun
 Alternatively, you may install steady-tun from source:
 
 ```
-go get github.com/Snawoot/steady-tun
+go install github.com/Snawoot/steady-tun@latest
 ```
 
 #### From Snap Store
