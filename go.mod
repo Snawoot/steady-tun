@@ -1,13 +1,11 @@
 module github.com/Snawoot/steady-tun
 
-go 1.23
-
-toolchain go1.23.2
+go 1.24.0
 
 require (
 	github.com/huandu/skiplist v1.2.1
-	github.com/jellydator/ttlcache/v3 v3.3.0
-	golang.org/x/sync v0.8.0
+	github.com/jellydator/ttlcache/v3 v3.4.0
+	golang.org/x/sync v0.19.0
 )
 
 require (
