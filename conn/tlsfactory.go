@@ -26,7 +26,7 @@ var _ Factory = &TLSConnFactory{}
 
 func NewTLSConnFactory(host string, port uint16, dialer ContextDialer,
 	certfile, keyfile string, cafile string, hostname_check bool,
-	tls_servername string, dialers uint, sessionCache tls.ClientSessionCache, logger *clog.CondLogger) (*TLSConnFactory, error) {
+	tls_servername string, verify_name string, dialers uint, sessionCache tls.ClientSessionCache, logger *clog.CondLogger) (*TLSConnFactory, error) {
 	if !hostname_check && cafile == "" {
 		return nil, errors.New("Hostname check should not be disabled in absence of custom CA file")
 	}
@@ -62,7 +62,7 @@ func NewTLSConnFactory(host string, port uint16, dialer ContextDialer,
 		Certificates:       certs,
 		ClientSessionCache: sessionCache,
 	}
-	if !hostname_check {
+	if !hostname_check || verify_name != "" {
 		tlsConfig.InsecureSkipVerify = true
 		tlsConfig.VerifyPeerCertificate = func(certificates [][]byte, _ [][]*x509.Certificate) error {
 			certs := make([]*x509.Certificate, len(certificates))
@@ -76,7 +76,7 @@ func NewTLSConnFactory(host string, port uint16, dialer ContextDialer,
 
 			opts := x509.VerifyOptions{
 				Roots:         roots, // On the server side, use config.ClientCAs.
-				DNSName:       "",    // No hostname check
+				DNSName:       verify_name,
 				Intermediates: x509.NewCertPool(),
 			}
 			for _, cert := range certs[1:] {
