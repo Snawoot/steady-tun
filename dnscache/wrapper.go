@@ -70,7 +70,7 @@ func WrapDialer(dialer ContextDialer, resolver Resolver, size int, posTTL, negTT
 
 		resItem := cache.Get(cacheKey{
 			network: resolveNetwork,
-			host: host,
+			host:    host,
 		})
 		if resItem == nil {
 			return nil, fmt.Errorf("cache lookup failed for pair <%q, %q>", resolveNetwork, host)

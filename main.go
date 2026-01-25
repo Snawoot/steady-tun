@@ -47,6 +47,7 @@ type CLIArgs struct {
 	cert, key, cafile     string
 	hostname_check        bool
 	tls_servername        string
+	verify_name           string
 	tlsSessionCache       bool
 	tlsEnabled            bool
 	dnsCacheTTL           time.Duration
@@ -71,7 +72,8 @@ func parse_args() CLIArgs {
 	flag.StringVar(&args.key, "key", "", "key for TLS certificate")
 	flag.StringVar(&args.cafile, "cafile", "", "override default CA certs by specified in file")
 	flag.BoolVar(&args.hostname_check, "hostname-check", true, "check hostname in server cert subject")
-	flag.StringVar(&args.tls_servername, "tls-servername", "", "specifies hostname to expect in server cert")
+	flag.StringVar(&args.tls_servername, "tls-servername", "", "override servername used in TLS configuration")
+	flag.StringVar(&args.verify_name, "verify-servername", "", "override servername used in TLS certificate verification")
 	flag.BoolVar(&args.tlsSessionCache, "tls-session-cache", true, "enable TLS session cache")
 	flag.BoolVar(&args.showVersion, "version", false, "show program version and exit")
 	flag.BoolVar(&args.tlsEnabled, "tls-enabled", true, "enable TLS client for pool connections")
@@ -146,6 +148,7 @@ func main() {
 			args.cafile,
 			args.hostname_check,
 			args.tls_servername,
+			args.verify_name,
 			args.dialers,
 			sessionCache,
 			connLogger)
